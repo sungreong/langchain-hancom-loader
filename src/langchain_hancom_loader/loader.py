@@ -19,28 +19,8 @@ from langchain_core.documents import Document
 from markdown import markdown
 
 _DEFAULT_BASE_URL = "https://api.sdk.hancom.com/api/api-services"
-_DEFAULT_WEBHOOK_ENV_FILE = Path(".runtime/hancom-webhook.env")
 _SUPPORTED_SUFFIXES = {".hwp", ".hwpx", ".pdf"}
 _MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024
-
-
-def _read_webhook_url_file() -> str | None:
-    configured_path = os.environ.get("HANCOM_WEBHOOK_ENV_FILE")
-    env_file = Path(configured_path) if configured_path else _DEFAULT_WEBHOOK_ENV_FILE
-    try:
-        lines = env_file.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return None
-
-    for raw_line in lines:
-        line = raw_line.strip()
-        if not line or line.startswith("#"):
-            continue
-        key, separator, value = line.partition("=")
-        if separator and key.strip() == "HANCOM_WEBHOOK_URL":
-            resolved = value.strip().strip('"').strip("'")
-            return resolved or None
-    return None
 
 
 class HancomDataLoaderError(RuntimeError):
@@ -74,10 +54,8 @@ class HancomDataLoader(BaseLoader):
             ``"paged"`` returns one document per page, and ``"single"`` returns
             one document for the entire input.
         webhook_url: Public URL to receive the API completion callback. Defaults to
-            the ``HANCOM_WEBHOOK_URL`` environment variable, then the
-            ``.runtime/hancom-webhook.env`` file created by the development tunnel
-            helper. The API requires this URL even though this loader polls for the
-            completed result.
+            the ``HANCOM_WEBHOOK_URL`` environment variable. The API requires this
+            URL even though this loader polls for the completed result.
         poll_interval: Seconds to wait between status checks.
         timeout: Maximum seconds to wait for a conversion to complete.
         request_timeout: Per-request HTTP timeout in seconds.
@@ -112,7 +90,6 @@ class HancomDataLoader(BaseLoader):
         self.webhook_url = (
             webhook_url
             or os.environ.get("HANCOM_WEBHOOK_URL")
-            or _read_webhook_url_file()
         )
         self.poll_interval = poll_interval
         self.timeout = timeout
@@ -146,8 +123,7 @@ class HancomDataLoader(BaseLoader):
         if not self.webhook_url:
             raise ValueError(
                 "Hancom webhook URL is required. Pass webhook_url or set "
-                "HANCOM_WEBHOOK_URL, or start deploy/compose.webhook.yaml "
-                "from the cloned repository."
+                "HANCOM_WEBHOOK_URL."
             )
         if self.mode not in {"elements", "paged", "single"}:
             raise ValueError("mode must be one of: elements, paged, single.")
