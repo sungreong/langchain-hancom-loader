@@ -1,0 +1,15 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+artifacts/
+.runtime/
+*.aijson
+*.hwp
+*.hwpx
+*.pdf
