@@ -40,11 +40,12 @@ from langchain_hancom_loader import HancomDataLoader
 loader = HancomDataLoader(
     "./document.hwpx",
     api_key=os.environ["HANCOM_API_KEY"],
+    webhook_url=os.environ["HANCOM_WEBHOOK_URL"],
     mode="elements",
 )
 ```
 
-이 값은 Docker Compose의 `environment`, 배포 서비스의 Secret, IDE 실행 구성, CI 환경 변수처럼 사용하는 실행 환경의 방식으로 전달합니다. 코드에서만 URL을 지정하고 싶다면 `HancomDataLoader(..., webhook_url="https://...")`도 사용할 수 있습니다.
+이 값은 Docker Compose의 `environment`, 배포 서비스의 Secret, IDE 실행 구성, CI 환경 변수처럼 사용하는 실행 환경의 방식으로 전달합니다. 위 예제처럼 `webhook_url`에 환경 변수 값을 명시적으로 전달할 수 있으며, 인수를 생략하면 `HancomDataLoader`가 `HANCOM_WEBHOOK_URL`을 자동으로 읽습니다. 코드에서만 URL을 지정하고 싶다면 `HancomDataLoader(..., webhook_url="https://...")`도 사용할 수 있습니다.
 
 ### 2. 공개 HTTPS webhook 주소가 없는 경우(개발·테스트)
 
@@ -85,6 +86,7 @@ from langchain_hancom_loader import HancomDataLoader
 loader = HancomDataLoader(
     "./document.hwpx",
     api_key=os.environ["HANCOM_API_KEY"],
+    webhook_url=os.environ["HANCOM_WEBHOOK_URL"],
     mode="elements",
 )
 ```
@@ -125,6 +127,7 @@ from langchain_hancom_loader import HancomDataLoader
 loader = HancomDataLoader(
     "./document.hwpx",
     api_key=os.environ["HANCOM_API_KEY"],
+    webhook_url=os.environ["HANCOM_WEBHOOK_URL"],
     mode="elements",
 )
 
@@ -164,7 +167,7 @@ except HancomAPIError:
 
 ## 보안과 제한 사항
 
-- `HANCOM_API_KEY`와 `webhook_url`은 실행 환경에서 전달합니다.
+- `HANCOM_API_KEY`와 `HANCOM_WEBHOOK_URL`은 실행 환경에서 전달합니다. 로더 생성 시 각각 `api_key`와 `webhook_url`에 명시적으로 넘길 수 있습니다.
 - 개발용 Quick Tunnel URL은 `.runtime/hancom-webhook.env`에 저장되며 Git에서 제외됩니다. 해당 파일에서 확인한 실제 주소를 로더 애플리케이션의 `HANCOM_WEBHOOK_URL`에 명시적으로 설정하세요.
 - 변환 API는 비동기 작업입니다. 로더는 완료 상태를 폴링한 뒤 결과를 LangChain 문서로 변환합니다.
 - 내장 webhook 수신기는 유효한 콜백을 기본적으로 저장하지 않습니다. 저장 기능은 연동 진단 목적으로만 사용하세요.
