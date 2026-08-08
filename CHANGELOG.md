@@ -4,6 +4,7 @@
 
 - Docker Compose의 tunnel 컨테이너가 Cloudflare Quick Tunnel을 시작하고 생성된 공개 HTTPS 주소를 직접 기록하도록 구성했습니다. 호스트 운영체제와 관계없이 Compose 명령으로 실행할 수 있습니다.
 - 생성된 webhook URL을 `.runtime/hancom-webhook.env`에 저장하고, 사용자가 실제 생성 주소를 애플리케이션의 `HANCOM_WEBHOOK_URL` 환경 변수에 명시적으로 전달하도록 안내합니다.
+- `hancom-webhook-url` 명령으로 Compose가 생성한 webhook 환경 변수 항목을 한 줄로 출력할 수 있습니다.
 
 ## 0.1.0 - 2026-08-08
 

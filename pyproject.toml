@@ -35,6 +35,7 @@ Repository = "https://github.com/sungreong/langchain-hancom-loader"
 
 [project.scripts]
 hancom-webhook-receiver = "langchain_hancom_loader.webhook:main"
+hancom-webhook-url = "langchain_hancom_loader.webhook_url:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/langchain_hancom_loader"]

@@ -61,14 +61,14 @@ Compose 구성은 다음 작업을 자동으로 수행합니다.
 3. 컨테이너가 최종 콜백 주소에 `/hancom/webhook`을 붙여 `.runtime/hancom-webhook.env`에 저장합니다.
 4. `--wait`가 URL 파일이 준비될 때까지 기다린 뒤 명령을 끝냅니다.
 
-`--wait`가 끝난 뒤 아래 명령을 실행하면 **실제로 생성된** 콜백 URL이 한 줄로 출력됩니다. 이 Docker Compose 명령은 Windows, macOS, Linux에서 동일합니다.
+`--wait`가 끝난 뒤 패키지 루트에서 아래 명령을 실행하면 **실제로 생성된** 콜백 URL이 환경 변수 형식으로 한 줄 출력됩니다. `hancom-webhook-url`은 패키지 설치 시 함께 제공되는 Windows, macOS, Linux 공통 명령입니다.
 
 ```bash
-docker compose -f deploy/compose.webhook.yaml exec -T tunnel python -c "from pathlib import Path; print(Path('/runtime/hancom-webhook.env').read_text().split('=', 1)[1].strip())"
-# https://<이번 실행에서 생성된 주소>.trycloudflare.com/hancom/webhook
+hancom-webhook-url
+# HANCOM_WEBHOOK_URL=https://<이번 실행에서 생성된 주소>.trycloudflare.com/hancom/webhook
 ```
 
-같은 값은 호스트의 `.runtime/hancom-webhook.env`에도 기록됩니다. 로더가 이 파일이나 로컬 포트를 자동으로 찾지는 않습니다. 출력된 실제 주소를 복사해 **로더를 실행하는 애플리케이션의 환경 변수**에 넣어 연결합니다.
+명령을 찾을 수 없는 Python 환경에서는 `python -m langchain_hancom_loader.webhook_url`로 같은 결과를 확인할 수 있습니다. 같은 값은 호스트의 `.runtime/hancom-webhook.env`에도 기록됩니다. 로더가 이 파일이나 로컬 포트를 자동으로 찾지는 않습니다. 출력된 한 줄을 복사해 **로더를 실행하는 애플리케이션의 환경 변수**에 넣어 연결합니다. URL만 필요하면 `hancom-webhook-url --value-only`를 사용하세요.
 
 ```dotenv
 HANCOM_API_KEY=your-api-key
