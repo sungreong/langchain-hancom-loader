@@ -19,21 +19,36 @@ cd ..
 python -c "from langchain_hancom_loader import HancomDataLoader; print(HancomDataLoader.__name__)"
 ```
 
-## 사용 전 준비
+## Webhook URL 설정(필수)
 
-문서를 실제로 변환하려면 한컴 SDK에서 발급한 API 키와 외부에서 접근 가능한 HTTPS webhook URL이 필요합니다. 개발·테스트에서는 아래 Compose 자동 연결이 임시 URL을 만들어 줍니다. 운영에서는 직접 관리하는 고정 HTTPS 주소를 사용하세요. API 키, 원본 문서, 변환 결과는 저장소에 추가하지 마세요.
+문서를 실제로 변환하려면 한컴 SDK에서 발급한 API 키와 외부에서 접근 가능한 HTTPS webhook URL이 **모두 필요합니다**. API 키, 원본 문서, 변환 결과는 저장소에 추가하지 마세요.
 
-PowerShell에서는 API 키를 다음처럼 설정합니다.
+### 1. 이미 공개 HTTPS webhook 주소가 있는 경우
+
+운영 중인 webhook 주소가 있다면 환경 변수로 전달하는 방법이 가장 간단합니다. `HancomDataLoader`는 명시적인 `webhook_url` 인수가 없을 때 `HANCOM_WEBHOOK_URL`을 자동으로 사용합니다.
 
 ```powershell
 $env:HANCOM_API_KEY = "your-api-key"
+$env:HANCOM_WEBHOOK_URL = "https://webhook.example.com/hancom/webhook"
 ```
 
-## Webhook 자동 연결(공개 주소가 없을 때, 개발·테스트)
+```python
+import os
 
-한컴 데이터 로더 API는 외부에서 접근 가능한 HTTPS webhook URL을 **필수로 요구합니다**. 이미 운영 중인 공개 HTTPS webhook 주소가 있다면 그 주소를 `webhook_url` 인수나 `HANCOM_WEBHOOK_URL` 환경 변수로 전달하면 됩니다.
+from langchain_hancom_loader import HancomDataLoader
 
-개발·테스트 환경처럼 공개 HTTPS 주소가 아직 없다면 아래 Compose 구성을 사용하세요. 로컬 수신기와 Cloudflare Quick Tunnel이 함께 시작되고, tunnel 컨테이너가 생성된 주소를 직접 기록합니다. Windows, macOS, Linux에서 같은 명령을 사용합니다.
+loader = HancomDataLoader(
+    "./document.hwpx",
+    api_key=os.environ["HANCOM_API_KEY"],
+    mode="elements",
+)
+```
+
+macOS와 Linux에서는 같은 값을 `export HANCOM_API_KEY=...`, `export HANCOM_WEBHOOK_URL=...`로 설정합니다. 코드에서만 URL을 지정하고 싶다면 `HancomDataLoader(..., webhook_url="https://...")`도 사용할 수 있습니다.
+
+### 2. 공개 HTTPS webhook 주소가 없는 경우(개발·테스트)
+
+공개 주소가 아직 없다면 아래 Compose 구성을 사용하세요. 로컬 수신기와 Cloudflare Quick Tunnel이 함께 시작되고, tunnel 컨테이너가 생성한 URL을 `.runtime/hancom-webhook.env`에 직접 기록합니다. Windows, macOS, Linux에서 같은 명령을 사용합니다.
 
 ```bash
 docker compose -f deploy/compose.webhook.yaml up -d --build --wait
@@ -53,7 +68,7 @@ docker compose -f deploy/compose.webhook.yaml exec -T tunnel \
   python -c "from pathlib import Path; print(Path('/runtime/hancom-webhook.env').read_text(), end='')"
 ```
 
-호스트에서도 `.runtime/hancom-webhook.env` 파일을 직접 열어 같은 주소를 확인할 수 있습니다. 저장소 루트에서 Python을 실행하면 `HancomDataLoader`가 이 파일을 자동으로 읽습니다. 따라서 개발·테스트 코드에서는 `webhook_url`을 생략할 수 있습니다.
+호스트에서도 `.runtime/hancom-webhook.env` 파일을 직접 열어 같은 주소를 확인할 수 있습니다. 저장소 루트에서 Python을 실행하면 `HancomDataLoader`가 이 파일을 자동으로 읽습니다. 따라서 개발·테스트 코드에서는 `webhook_url`을 생략할 수 있습니다. 이 파일보다 `HANCOM_WEBHOOK_URL` 환경 변수가 우선합니다.
 
 ```python
 import os
