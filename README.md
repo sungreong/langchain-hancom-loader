@@ -98,28 +98,21 @@ docker compose -f deploy/compose.webhook.yaml down
 
 Quick Tunnel 주소는 개발·테스트용 임시 주소입니다. 터널 컨테이너를 중지하거나 다시 만들면 주소가 바뀔 수 있으므로 Compose 명령을 다시 실행해야 합니다. `docker compose down`으로 tunnel을 종료하면 만료된 `.runtime/hancom-webhook.env`도 자동으로 삭제됩니다. 터널과 webhook 컨테이너가 실행 중인 동안에만 외부 콜백을 받을 수 있습니다.
 
-## Webhook 수신기 수동 실행과 운영 설정
+## 운영용 webhook 컨테이너
 
-로컬 수신기만 직접 실행하려면 다음 명령을 사용합니다.
-
-```bash
-hancom-webhook-receiver --port 8000
-# 또는 python -m langchain_hancom_loader.webhook --port 8000
-```
-
-`GET /healthz`는 상태 확인용으로 `204 No Content`를 반환하고, `POST /hancom/webhook`은 JSON 객체 콜백만 받아 `204 No Content`를 반환합니다. 기본 설정에서는 콜백 본문을 저장하지 않습니다.
-
-운영에서는 Quick Tunnel 대신 직접 관리하는 공개 HTTPS 주소를 준비해야 합니다. 운영 도메인의 리버스 프록시 또는 Ingress가 수신기의 `8000` 포트와 `/hancom/webhook` 경로로 요청을 전달하도록 설정한 뒤, 그 주소를 `webhook_url`에 명시적으로 넣습니다.
-
-```python
-webhook_url = "https://webhook.example.com/hancom/webhook"
-```
-
-연동을 진단할 때만 `--output-dir`로 콜백 본문을 저장할 수 있습니다. 콜백에 작업 정보가 포함될 수 있으므로 저장 경로는 Git으로 추적하지 말고, 확인 후 삭제하거나 접근을 제한하세요.
+운영에서는 별도의 수신기 명령을 실행하지 않아도 됩니다. 패키지에 포함된 `Dockerfile.webhook`과 Compose 파일이 webhook 수신 컨테이너를 제공합니다. 다음 명령으로 컨테이너를 시작하세요.
 
 ```bash
-hancom-webhook-receiver --port 8000 --output-dir ./webhook-events
+docker compose -f deploy/compose.webhook.production.yaml up -d --build
 ```
+
+컨테이너는 `8000` 포트에서 `POST /hancom/webhook`을 받고, 상태 확인에는 `GET /healthz`를 제공합니다. 배포 환경의 HTTPS 도메인·Ingress·리버스 프록시가 이 컨테이너의 `8000` 포트와 `/hancom/webhook` 경로로 연결되도록 설정합니다. 이후 그 **공개 HTTPS 주소**를 로더 애플리케이션의 환경 변수에 설정하면 됩니다.
+
+```dotenv
+HANCOM_WEBHOOK_URL=https://webhook.example.com/hancom/webhook
+```
+
+이 Compose 파일은 webhook 컨테이너만 실행하며 TLS 인증서와 도메인 연결은 포함하지 않습니다. 이미 사용하는 클라우드 Load Balancer, Ingress 또는 리버스 프록시에서 HTTPS를 종료해 컨테이너로 전달하세요.
 
 ## 최소 사용 예시
 
