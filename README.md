@@ -141,6 +141,20 @@ for document in documents:
 
 기본 `elements` 모드는 AIJSON 요소마다 하나의 `Document`를 반환합니다. `mode="paged"`는 페이지별 문서를, `mode="single"`은 전체 문서 하나를 반환합니다. 요소 모드의 메타데이터에는 문서·페이지·요소 식별자와 종류, 위치 좌표처럼 검색 근거를 확인하는 데 쓸 수 있는 정보가 포함됩니다.
 
+## 입력 형식과 실측 호환성
+
+이 패키지는 현재 `.hwp`, `.hwpx`, `.pdf`만 입력으로 허용합니다. PDF AIJSON의 `elements` 배열형 결과뿐 아니라, HWP·HWPX에서 반환되는 `documentPr`·`body` 배열형 결과도 LangChain `Document`로 변환합니다. 후자의 경우 문단 또는 표 셀 하나가 `Document`가 되며 `page`, `list_id`, `paragraph_id`, 표의 행·열·병합 정보 등을 메타데이터로 유지합니다.
+
+아래는 2026-08-08에 공개 샘플을 현재 API 엔드포인트와 이 패키지 소스로 변환한 결과입니다. Docker Compose 컨테이너에서 `mode="elements"`로 실행했으며, 샘플 파일과 API 응답은 저장소에 포함하지 않았습니다.
+
+| 형식 | 공개 샘플 | 결과 | 현재 패키지에서의 처리 |
+| --- | --- | --- | --- |
+| HWP | [hwplib `changing-paragraph-text.hwp`](https://github.com/neolord0/hwplib/blob/main/sample_hwp/changing-paragraph-text.hwp) | 완료, 문단 2개 | 지원. 레거시 HWP AIJSON의 `body` 항목을 문단 `Document`로 변환합니다. |
+| HWPX | [python-hwpx `FormattingShowcase.hwpx`](https://github.com/airmang/python-hwpx/blob/main/examples/FormattingShowcase.hwpx) | 완료, 문단·표 셀 13개 | 지원. 표 셀에는 행·열·병합 메타데이터가 남습니다. |
+| PDF | [W3C Dummy PDF](https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf) | 완료, 요소 1개 | 지원. `elements` 배열형 AIJSON을 요소 `Document`로 변환합니다. |
+
+이 표는 특정 공개 파일과 당일 엔드포인트 응답에 대한 호환성 확인일 뿐, 모든 문서의 변환 품질을 보장하지는 않습니다. 한컴 데이터 로더 서비스의 최신 지원 범위는 [공식 페이지](https://sdk.hancom.com/services/1?type=DATA_LOADER)와 제품 검수로 확인하세요.
+
 ## 오류 처리
 
 ```python

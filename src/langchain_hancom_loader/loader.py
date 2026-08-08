@@ -297,9 +297,9 @@ class HancomDataLoader(BaseLoader):
         self, payload: Mapping[str, Any]
     ) -> tuple[list[Document], dict[str, Any]]:
         elements = payload.get("elements")
-        metadata = payload.get("metadata")
         if not isinstance(elements, list):
-            raise HancomAPIError("aijson result did not include an elements array.")
+            return self._parse_legacy_hwp_aijson(payload)
+        metadata = payload.get("metadata")
         if not isinstance(metadata, Mapping):
             metadata = {}
 
@@ -330,6 +330,108 @@ class HancomDataLoader(BaseLoader):
                 )
             parsed_elements.append(self._parse_element(element, source_metadata, index))
         return parsed_elements, source_metadata
+
+    def _parse_legacy_hwp_aijson(
+        self, payload: Mapping[str, Any]
+    ) -> tuple[list[Document], dict[str, Any]]:
+        """Map the paragraph-based AIJSON returned for HWP and HWPX files.
+
+        PDF conversions currently return an ``elements`` array, whereas the
+        HWP/HWPX API result observed in live conversions contains ``documentPr``
+        and ``body``. Keep the source fields rather than pretending this is the
+        same element schema: callers can still retrieve paragraph/table-cell text
+        and retain page, list, paragraph, and table-position metadata.
+        """
+        document_pr = payload.get("documentPr")
+        body = payload.get("body")
+        if not isinstance(document_pr, Mapping) or not isinstance(body, list):
+            raise HancomAPIError(
+                "aijson result did not include either an elements array or a legacy HWP body."
+            )
+
+        file_ext = document_pr.get("fileExt")
+        file_format = (
+            file_ext.upper()
+            if isinstance(file_ext, str) and file_ext
+            else self.file_path.suffix.lstrip(".").upper()
+        )
+        source_metadata: dict[str, Any] = {
+            "source": str(self.file_path.resolve()),
+            "file_name": self.file_path.name,
+            "file_format": file_format,
+            "hancom_aijson_schema": "legacy_hwp",
+        }
+        for source_key, metadata_key in (
+            ("aiJsonVer", "hancom_aijson_version"),
+            ("title", "document_title"),
+        ):
+            value = document_pr.get(source_key)
+            if self._is_scalar_metadata(value):
+                source_metadata[metadata_key] = value
+
+        parsed_elements: list[Document] = []
+        for index, item in enumerate(body):
+            if not isinstance(item, Mapping):
+                raise HancomAPIError(
+                    f"legacy HWP body item at index {index} must be a JSON object."
+                )
+            parsed_elements.append(
+                self._parse_legacy_hwp_element(item, source_metadata, index)
+            )
+        return parsed_elements, source_metadata
+
+    @staticmethod
+    def _parse_legacy_hwp_element(
+        item: Mapping[str, Any], source_metadata: Mapping[str, Any], index: int
+    ) -> Document:
+        contents = item.get("contents")
+        contents = contents if isinstance(contents, Mapping) else {}
+        text = contents.get("text")
+        text = text if isinstance(text, str) else ""
+
+        client_info = item.get("clientInfo")
+        client_info = client_info if isinstance(client_info, Mapping) else {}
+        pos_info = item.get("posInfo")
+        pos_info = pos_info if isinstance(pos_info, Mapping) else {}
+        inference_info = item.get("inferenceInfo")
+        inference_info = inference_info if isinstance(inference_info, Mapping) else {}
+
+        metadata: dict[str, Any] = dict(source_metadata)
+        metadata["element_index"] = index
+        parent_type = client_info.get("parentType")
+        if isinstance(parent_type, str) and parent_type:
+            metadata["category"] = parent_type
+        metadata["category_type"] = "legacy_hwp"
+        for source_key, metadata_key in (
+            ("listId", "list_id"),
+            ("paraId", "paragraph_id"),
+        ):
+            value = pos_info.get(source_key)
+            if HancomDataLoader._is_scalar_metadata(value):
+                metadata[metadata_key] = value
+        for source_key, metadata_key in (
+            ("parentObjectName", "parent_object_name"),
+            ("rowAddr", "table_row"),
+            ("colAddr", "table_column"),
+            ("rowSpan", "table_row_span"),
+            ("colSpan", "table_column_span"),
+        ):
+            value = client_info.get(source_key)
+            if HancomDataLoader._is_scalar_metadata(value):
+                metadata[metadata_key] = value
+        for source_key, metadata_key in (
+            ("inferenceType", "inference_type"),
+            ("inferenceLevel", "inference_level"),
+        ):
+            value = inference_info.get(source_key)
+            if HancomDataLoader._is_scalar_metadata(value):
+                metadata[metadata_key] = value
+
+        page = pos_info.get("docPageNum")
+        if isinstance(page, int) and not isinstance(page, bool) and page >= 1:
+            metadata["page"] = page
+            metadata["page_index"] = page - 1
+        return Document(page_content=text, metadata=metadata)
 
     def _documents_from_elements(
         self, parsed_elements: list[Document], source_metadata: Mapping[str, Any]
