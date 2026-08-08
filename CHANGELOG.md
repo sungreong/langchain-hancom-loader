@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- 외부 HTTPS 환경에 배포할 수 있는 선택형 webhook 수신기와 Docker Compose 실행 예시를 추가했습니다.
+- 콜백 본문 저장을 기본 비활성화하고, 진단 시에만 `--output-dir`로 저장하도록 했습니다.
+
 ## 0.1.0 - 2026-08-08
 
 - 한컴 데이터 로더 API의 비동기 변환 결과를 LangChain `Document`로 변환하는 `HancomDataLoader`를 추가했습니다.

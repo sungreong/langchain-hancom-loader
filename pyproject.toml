@@ -33,12 +33,16 @@ classifiers = [
 [project.urls]
 Repository = "https://github.com/sungreong/langchain-hancom-loader"
 
+[project.scripts]
+hancom-webhook-receiver = "langchain_hancom_loader.webhook:main"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/langchain_hancom_loader"]
 
 [tool.hatch.build.targets.sdist]
 only-include = [
   "src/langchain_hancom_loader",
+  "LICENSE",
   "README.md",
   "pyproject.toml",
 ]

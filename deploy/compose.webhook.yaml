@@ -1,0 +1,7 @@
+services:
+  webhook:
+    build:
+      context: ..
+      dockerfile: Dockerfile.webhook
+    ports:
+      - "${HANCOM_WEBHOOK_PORT:-8000}:8000"
