@@ -48,7 +48,7 @@ loader = HancomDataLoader(
 
 ### 2. 공개 HTTPS webhook 주소가 없는 경우(개발·테스트)
 
-공개 주소가 아직 없다면 아래 Compose 구성을 사용하세요. 로컬 수신기와 Cloudflare Quick Tunnel이 함께 시작되고, tunnel 컨테이너가 생성한 URL을 `.runtime/hancom-webhook.env`에 직접 기록합니다. Windows, macOS, Linux에서 같은 명령을 사용합니다.
+개발자가 로컬에서 바로 테스트할 때는 공개 도메인을 만들 필요가 없습니다. 아래 Compose 구성이 로컬 수신기와 Cloudflare Quick Tunnel을 함께 시작하고, tunnel 컨테이너가 생성한 임시 공개 URL을 `.runtime/hancom-webhook.env`에 직접 기록합니다. Windows, macOS, Linux에서 같은 명령을 사용합니다.
 
 ```bash
 docker compose -f deploy/compose.webhook.yaml up -d --build --wait
@@ -106,13 +106,14 @@ Quick Tunnel 주소는 개발·테스트용 임시 주소입니다. 터널 컨�
 docker compose -f deploy/compose.webhook.production.yaml up -d --build
 ```
 
-컨테이너는 `8000` 포트에서 `POST /hancom/webhook`을 받고, 상태 확인에는 `GET /healthz`를 제공합니다. 배포 환경의 HTTPS 도메인·Ingress·리버스 프록시가 이 컨테이너의 `8000` 포트와 `/hancom/webhook` 경로로 연결되도록 설정합니다. 이후 그 **공개 HTTPS 주소**를 로더 애플리케이션의 환경 변수에 설정하면 됩니다.
+컨테이너는 `8000` 포트에서 `POST /hancom/webhook`을 받고, 상태 확인에는 `GET /healthz`를 제공합니다. 이 운영 Compose 파일은 도메인을 자동으로 만들지 않습니다. `webhook.example.com`은 **운영자가 DNS와 HTTPS를 이미 연결한 도메인의 예시**입니다. 배포 환경의 HTTPS 도메인·Ingress·리버스 프록시가 이 컨테이너의 `8000` 포트와 `/hancom/webhook` 경로로 연결되도록 설정한 뒤, 그 공개 HTTPS 주소를 로더 애플리케이션의 환경 변수에 설정합니다.
 
 ```dotenv
+# webhook.example.com은 실제 운영 도메인으로 교체합니다.
 HANCOM_WEBHOOK_URL=https://webhook.example.com/hancom/webhook
 ```
 
-이 Compose 파일은 webhook 컨테이너만 실행하며 TLS 인증서와 도메인 연결은 포함하지 않습니다. 이미 사용하는 클라우드 Load Balancer, Ingress 또는 리버스 프록시에서 HTTPS를 종료해 컨테이너로 전달하세요.
+로컬 개발·테스트라면 이 운영 Compose 파일을 쓰지 말고 위 Quick Tunnel 흐름을 사용하세요. 운영 Compose 파일은 webhook 컨테이너만 실행하며 TLS 인증서와 도메인 연결은 포함하지 않습니다. 이미 사용하는 클라우드 Load Balancer, Ingress 또는 리버스 프록시에서 HTTPS를 종료해 컨테이너로 전달하세요.
 
 ## 최소 사용 예시
 
