@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Docker Compose의 tunnel 컨테이너가 Cloudflare Quick Tunnel을 시작하고 생성된 공개 HTTPS 주소를 직접 기록하도록 구성했습니다. 호스트 운영체제와 관계없이 Compose 명령으로 실행할 수 있습니다.
+- 생성된 webhook URL을 `.runtime/hancom-webhook.env`에 저장하고 `HancomDataLoader`가 명시적 URL이나 환경 변수가 없을 때 이 파일을 자동으로 읽도록 했습니다.
+
 ## 0.1.0 - 2026-08-08
 
 - 한컴 데이터 로더 API의 비동기 변환 결과를 LangChain `Document`로 변환하는 `HancomDataLoader`를 추가했습니다.

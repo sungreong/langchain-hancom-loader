@@ -3,5 +3,52 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile.webhook
+    network_mode: bridge
     ports:
       - "${HANCOM_WEBHOOK_PORT:-8000}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:8000/healthz')
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  tunnel:
+    build:
+      context: ..
+      dockerfile: Dockerfile.tunnel
+    network_mode: bridge
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      webhook:
+        condition: service_healthy
+    environment:
+      TUNNEL_TARGET_URL: "http://host.docker.internal:${HANCOM_WEBHOOK_PORT:-8000}"
+      HANCOM_WEBHOOK_ENV_FILE: /runtime/hancom-webhook.env
+      HANCOM_WEBHOOK_PATH: /hancom/webhook
+    volumes:
+      - ../.runtime:/runtime
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          from pathlib import Path;
+          value = Path('/runtime/hancom-webhook.env').read_text(encoding='utf-8');
+          webhook_url = value.split('=', 1)[1].strip();
+          health_url = webhook_url.removesuffix('/hancom/webhook') + '/healthz';
+          response = urllib.request.urlopen(health_url, timeout=5);
+          raise SystemExit(0 if response.status == 204 else 1)
+      start_interval: 2s
+      start_period: 30s
+      interval: 30s
+      timeout: 7s
+      retries: 5

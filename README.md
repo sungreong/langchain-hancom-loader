@@ -21,7 +21,7 @@ python -c "from langchain_hancom_loader import HancomDataLoader; print(HancomDat
 
 ## 사용 전 준비
 
-문서를 실제로 변환하려면 한컴 SDK에서 발급한 API 키와 외부에서 접근 가능한 HTTPS webhook URL이 필요합니다. API 키, 원본 문서, 변환 결과는 저장소에 추가하지 마세요.
+문서를 실제로 변환하려면 한컴 SDK에서 발급한 API 키와 외부에서 접근 가능한 HTTPS webhook URL이 필요합니다. 개발·테스트에서는 아래 Compose 자동 연결이 임시 URL을 만들어 줍니다. 운영에서는 직접 관리하는 고정 HTTPS 주소를 사용하세요. API 키, 원본 문서, 변환 결과는 저장소에 추가하지 마세요.
 
 PowerShell에서는 API 키를 다음처럼 설정합니다.
 
@@ -29,11 +29,66 @@ PowerShell에서는 API 키를 다음처럼 설정합니다.
 $env:HANCOM_API_KEY = "your-api-key"
 ```
 
-## Webhook 수신기 설정(선택)
+## Webhook 자동 연결(공개 주소가 없을 때, 개발·테스트)
 
-한컴 데이터 로더 API는 외부에서 접근 가능한 HTTPS webhook URL을 사용합니다. 이 패키지는 완료 콜백을 수신해 정상 응답하는 작은 수신기를 함께 제공합니다. 로더는 변환 상태를 직접 폴링하므로, 수신기는 콜백을 확인하거나 운영 환경의 webhook URL을 구성할 때 사용하면 됩니다.
+한컴 데이터 로더 API는 외부에서 접근 가능한 HTTPS webhook URL을 **필수로 요구합니다**. 이미 운영 중인 공개 HTTPS webhook 주소가 있다면 그 주소를 `webhook_url` 인수나 `HANCOM_WEBHOOK_URL` 환경 변수로 전달하면 됩니다.
 
-로컬 또는 서버에서 수신기를 실행합니다.
+개발·테스트 환경처럼 공개 HTTPS 주소가 아직 없다면 아래 Compose 구성을 사용하세요. 로컬 수신기와 Cloudflare Quick Tunnel이 함께 시작되고, tunnel 컨테이너가 생성된 주소를 직접 기록합니다. Windows, macOS, Linux에서 같은 명령을 사용합니다.
+
+```bash
+docker compose -f deploy/compose.webhook.yaml up -d --build --wait
+```
+
+Compose 구성은 다음 작업을 자동으로 수행합니다.
+
+1. `deploy/compose.webhook.yaml`로 webhook 수신기를 빌드하고 실행합니다.
+2. tunnel 컨테이너가 Cloudflare Quick Tunnel을 시작해 임시 `https://...trycloudflare.com` 주소를 만듭니다.
+3. 컨테이너가 최종 콜백 주소에 `/hancom/webhook`을 붙여 `.runtime/hancom-webhook.env`에 저장합니다.
+4. `--wait`가 URL 파일이 준비될 때까지 기다린 뒤 명령을 끝냅니다.
+
+생성된 주소는 다음 명령으로 확인할 수 있습니다.
+
+```bash
+docker compose -f deploy/compose.webhook.yaml exec -T tunnel \
+  python -c "from pathlib import Path; print(Path('/runtime/hancom-webhook.env').read_text(), end='')"
+```
+
+호스트에서도 `.runtime/hancom-webhook.env` 파일을 직접 열어 같은 주소를 확인할 수 있습니다. 저장소 루트에서 Python을 실행하면 `HancomDataLoader`가 이 파일을 자동으로 읽습니다. 따라서 개발·테스트 코드에서는 `webhook_url`을 생략할 수 있습니다.
+
+```python
+import os
+
+from langchain_hancom_loader import HancomDataLoader
+
+loader = HancomDataLoader(
+    "./document.hwpx",
+    api_key=os.environ["HANCOM_API_KEY"],
+    mode="elements",
+)
+```
+
+로컬 상태 확인과 종료 명령은 다음과 같습니다.
+
+```bash
+curl -i http://localhost:8000/healthz
+docker compose -f deploy/compose.webhook.yaml down
+```
+
+기본 `8000` 포트가 이미 사용 중이면 다른 포트를 지정할 수 있습니다.
+
+```bash
+export HANCOM_WEBHOOK_PORT=8012  # macOS/Linux
+docker compose -f deploy/compose.webhook.yaml up -d --build --wait
+curl -i http://localhost:8012/healthz
+```
+
+PowerShell에서 포트를 바꿀 때는 `export` 대신 `$env:HANCOM_WEBHOOK_PORT = "8012"`를 사용한 뒤 같은 Compose 명령을 실행합니다.
+
+Quick Tunnel 주소는 개발·테스트용 임시 주소입니다. 터널 컨테이너를 중지하거나 다시 만들면 주소가 바뀔 수 있으므로 Compose 명령을 다시 실행해야 합니다. `docker compose down`으로 tunnel을 종료하면 만료된 `.runtime/hancom-webhook.env`도 자동으로 삭제됩니다. 터널과 webhook 컨테이너가 실행 중인 동안에만 외부 콜백을 받을 수 있습니다.
+
+## Webhook 수신기 수동 실행과 운영 설정
+
+로컬 수신기만 직접 실행하려면 다음 명령을 사용합니다.
 
 ```bash
 hancom-webhook-receiver --port 8000
@@ -42,17 +97,10 @@ hancom-webhook-receiver --port 8000
 
 `GET /healthz`는 상태 확인용으로 `204 No Content`를 반환하고, `POST /hancom/webhook`은 JSON 객체 콜백만 받아 `204 No Content`를 반환합니다. 기본 설정에서는 콜백 본문을 저장하지 않습니다.
 
-Docker Compose로 실행하려면 저장소를 복제한 뒤 다음 명령을 사용합니다.
-
-```bash
-docker compose -f deploy/compose.webhook.yaml up -d --build
-curl http://localhost:8000/healthz
-```
-
-공개 HTTPS 주소는 직접 준비해야 합니다. 운영 도메인의 리버스 프록시 또는 Ingress가 컨테이너의 `8000` 포트와 `/hancom/webhook` 경로로 요청을 전달하도록 설정한 뒤, 그 주소를 `webhook_url`에 넣습니다.
+운영에서는 Quick Tunnel 대신 직접 관리하는 공개 HTTPS 주소를 준비해야 합니다. 운영 도메인의 리버스 프록시 또는 Ingress가 수신기의 `8000` 포트와 `/hancom/webhook` 경로로 요청을 전달하도록 설정한 뒤, 그 주소를 `webhook_url`에 명시적으로 넣습니다.
 
 ```python
-webhook_url = "https://example.com/hancom/webhook"
+webhook_url = "https://webhook.example.com/hancom/webhook"
 ```
 
 연동을 진단할 때만 `--output-dir`로 콜백 본문을 저장할 수 있습니다. 콜백에 작업 정보가 포함될 수 있으므로 저장 경로는 Git으로 추적하지 말고, 확인 후 삭제하거나 접근을 제한하세요.
@@ -71,7 +119,6 @@ from langchain_hancom_loader import HancomDataLoader
 loader = HancomDataLoader(
     "./document.hwpx",
     api_key=os.environ["HANCOM_API_KEY"],
-    webhook_url="https://example.com/hancom/webhook",
     mode="elements",
 )
 
@@ -112,6 +159,8 @@ except HancomAPIError:
 ## 보안과 제한 사항
 
 - `HANCOM_API_KEY`와 `webhook_url`은 실행 환경에서 전달합니다.
+- 개발용 자동 연결 URL은 `.runtime/hancom-webhook.env`에 저장되며 Git에서 제외됩니다. 다른 위치의 파일을 사용하려면 `HANCOM_WEBHOOK_ENV_FILE`에 경로를 설정합니다.
 - 변환 API는 비동기 작업입니다. 로더는 완료 상태를 폴링한 뒤 결과를 LangChain 문서로 변환합니다.
 - 내장 webhook 수신기는 유효한 콜백을 기본적으로 저장하지 않습니다. 저장 기능은 연동 진단 목적으로만 사용하세요.
+- Cloudflare Quick Tunnel은 개발·테스트 전용입니다. 운영에서는 고정 도메인과 접근 정책을 적용한 webhook 주소를 명시적으로 전달하세요.
 - 문서 구조를 보존하는 결과라도 모든 문서에서 검색·답변의 정확성을 보장하지는 않습니다. 실제 적용 전에는 입력 문서와 질문으로 결과를 검토하세요.

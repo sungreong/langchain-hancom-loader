@@ -42,7 +42,14 @@ packages = ["src/langchain_hancom_loader"]
 [tool.hatch.build.targets.sdist]
 only-include = [
   "src/langchain_hancom_loader",
+  "deploy",
+  "tests",
+  "Dockerfile.webhook",
+  "Dockerfile.tunnel",
+  "CHANGELOG.md",
+  "CONTRIBUTING.md",
   "LICENSE",
   "README.md",
+  "SECURITY.md",
   "pyproject.toml",
 ]
